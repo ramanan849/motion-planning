@@ -41,7 +41,7 @@ class DStar:
         self.open_list = []
         self.parent = {}
         
-        # Calculate heuristic (Manhattan distance to goal)
+        # Calculate heuristic
         for i in range(self.grid_width):
             for j in range(self.grid_height):
                 self.heuristic_map[i][j] = abs(self.goal[0] - i) + abs(self.goal[1] - j)
@@ -134,18 +134,18 @@ class PathPlanner:
 
 
 
-Occup_Grid = [[0] * 100 for _ in range(100)]  # 100x100 grid
-Occup_Grid[5][5] = 1  # Adding an obstacle
-Occup_Grid[10][10] = 1  # Adding another obstacle
+Occup_Grid = [[0] * 10 for _ in range(10)]  # 100x100 grid
+Occup_Grid[2][7] = 1  # Adding an obstacle - box 1
+Occup_Grid[8][4] = 1  # Adding another obstacle 
 
 
-crystals = [(random.randint(0, 99), random.randint(0, 99)) for _ in range(20)]
+crystals = [(random.randint(0, 9), random.randint(0, 9)) for _ in range(20)]
 for crystal in crystals:
     Occup_Grid[crystal[0]][crystal[1]] = 2  # Mark crystals with value 2
 
 # Fixed obstacles (2 obstacles placed)
-Occup_Grid[20][20] = 1  # Obstacle 1
-Occup_Grid[30][30] = 1  # Obstacle 2
+Occup_Grid[4][6] = 1  # Obstacle 1 - box 1
+Occup_Grid[3][9] = 1  # Obstacle 2 - box 2
 
 # Starting position
 Start = (0, 0)
@@ -162,7 +162,6 @@ for crystal in crystals:
     path = dstar_planner.plan()
     path_planner.Start = path[-1]  # Set new start as the last point of the path
     path_planner.Goal = crystal
+    path_planner.visualize_path(path)
     
-    # After reaching one crystal, re-plan for the next crystal
-    # (You can add logic here to stop when all crystals are visited)
-path_planner.visualize_path(path)
+
