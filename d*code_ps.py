@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import time
 import random
 import math
+import heapq
 
 '''
 So, the alterred algo would be like, we have a list of coordinates where the crystals are present, but we keep it hidden from the algo, in a sense, the algo will not know the entire information at the start - initially, just one crystal would be visible and as soon one crystal is visible, the next crystal would be visible (given) to the algo to create a path
@@ -25,9 +26,8 @@ So, the alterred algo would be like, we have a list of coordinates where the cry
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-import random
-import math
 import heapq
+import random
 
 class DStar:
     def __init__(self, start, goal, grid):
@@ -39,15 +39,15 @@ class DStar:
         self.cost_map = np.inf * np.ones_like(grid, dtype=float)
         self.heuristic_map = np.zeros_like(grid, dtype=float)
         self.open_list = []
-        self.parent = {}
-        
-        # Calculate heuristic
+
+        # Initialize heuristic map (Manhattan distance to goal)
         for i in range(self.grid_width):
             for j in range(self.grid_height):
-                self.heuristic_map[i][j] = abs(self.goal[0] - i) + abs(self.goal[1] - j)
-        
-        self.cost_map[self.goal] = 0
-        self.push(self.goal, 0)
+                self.heuristic_map[i][j] = abs(goal[0] - i) + abs(goal[1] - j)
+
+        # Start with the goal
+        self.cost_map[goal] = 0
+        self.push(goal, 0)
 
     def push(self, node, cost):
         heapq.heappush(self.open_list, (cost + self.heuristic_map[node[0], node[1]], node))
@@ -55,11 +55,6 @@ class DStar:
 
     def pop(self):
         return heapq.heappop(self.open_list)[1]
-
-    def update_cost(self, node, new_cost):
-        if new_cost < self.cost_map[node]:
-            self.cost_map[node] = new_cost
-            self.push(node, new_cost)
 
     def valid(self, x, y):
         return 0 <= x < self.grid_width and 0 <= y < self.grid_height and self.grid[x][y] != 1
@@ -73,15 +68,18 @@ class DStar:
                 neighbors.append((nx, ny))
         return neighbors
 
+    def update_cost(self, node, new_cost):
+        if new_cost < self.cost_map[node]:
+            self.push(node, new_cost)
+
     def plan(self):
         while self.open_list:
             current_node = self.pop()
             if current_node == self.start:
                 break
-
             neighbors = self.expand_neighbors(current_node)
             for neighbor in neighbors:
-                new_cost = self.cost_map[current_node] + 1  # Assuming uniform cost for simplicity
+                new_cost = self.cost_map[current_node] + 1  # Uniform cost
                 self.update_cost(neighbor, new_cost)
 
         # Backtrack to generate the path
@@ -95,73 +93,85 @@ class DStar:
                 if self.cost_map[neighbor] < min_cost:
                     min_cost = self.cost_map[neighbor]
                     next_node = neighbor
+            if next_node is None:  # No valid neighbor
+                break
             node = next_node
         path.append(self.goal)
         return path[::-1]
 
-    def update_map(self, new_obstacle_position):
-        x, y = new_obstacle_position
-        self.grid[x][y] = 1  # Mark as obstacle
-        # After adding a new obstacle, re-run D* from the goal
-        self.__init__(self.start, self.goal, self.grid)
+    def update_map(self, new_goal):
+        """Update the map with a new goal without reinitializing."""
+        self.goal = new_goal
+        self.cost_map = np.inf * np.ones_like(self.grid, dtype=float)
+        self.heuristic_map = np.zeros_like(self.grid, dtype=float)
+        for i in range(self.grid_width):
+            for j in range(self.grid_height):
+                self.heuristic_map[i][j] = abs(new_goal[0] - i) + abs(new_goal[1] - j)
+        self.cost_map[new_goal] = 0
+        self.push(new_goal, 0)
 
 
 class PathPlanner:
-    def __init__(self, Start, Goal, Occup_Grid):
-        self.Start = Start
-        self.Goal = Goal
-        self.grid_width = len(Occup_Grid)
-        self.grid_height = len(Occup_Grid[0])
-        self.occup_grid = Occup_Grid
+    def __init__(self, start, goal, grid):
+        self.start = start
+        self.goal = goal
+        self.grid = grid
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))  # Set up a single figure
+        plt.ion()  # Enable interactive mode
 
-    def visualize_path(self, path):
-        """Visualizes the grid with the path highlighted."""
-        grid = np.array(self.occup_grid)
-        # Mark the start and goal
-        grid[self.Start[0]][self.Start[1]] = 2  # Start is marked with 2
-        grid[self.Goal[0]][self.Goal[1]] = 3  # Goal is marked with 3
-
-        # Mark the path on the grid
+    def visualize_grid(self, path, current_crystal):
+        """Visualizes the grid with the path and updates interactively."""
+        grid = np.array(self.grid)
+        grid[self.start[0]][self.start[1]] = 2  # Start point
+        grid[current_crystal[0]][current_crystal[1]] = 3  # Current crystal
         for x, y in path:
-            grid[int(x)][int(y)] = 4  # Path is marked with 4
+            grid[x][y] = 4  # Path
 
-        # Visualize using matplotlib
-        plt.figure(figsize=(8, 8))
-        plt.imshow(grid, cmap="viridis", origin="upper")
-        plt.colorbar(label="Grid Values")
-        plt.title("Path Traversed")
-        plt.show()
-
-
-
-Occup_Grid = [[0] * 10 for _ in range(10)]  # 100x100 grid
-Occup_Grid[2][7] = 1  # Adding an obstacle - box 1
-Occup_Grid[8][4] = 1  # Adding another obstacle 
+        # Clear and redraw the updated grid
+        self.ax.clear()
+        self.ax.imshow(grid, cmap="viridis", origin="upper")
+        self.ax.set_title("Path Traversed and Grid State")
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
 
 
-crystals = [(random.randint(0, 9), random.randint(0, 9)) for _ in range(20)]
+# Grid setup (10x10 for simplicity)
+Occup_Grid = [[0] * 10 for _ in range(10)]
+random.seed(42)
+
+# Randomly place 10 crystals
+crystals = [(random.randint(0, 9), random.randint(0, 9)) for _ in range(10)]
 for crystal in crystals:
-    Occup_Grid[crystal[0]][crystal[1]] = 2  # Mark crystals with value 2
+    Occup_Grid[crystal[0]][crystal[1]] = 2  # Mark crystals as value 2
 
-# Fixed obstacles (2 obstacles placed)
-Occup_Grid[4][6] = 1  # Obstacle 1 - box 1
-Occup_Grid[3][9] = 1  # Obstacle 2 - box 2
+# Fixed obstacles
+Occup_Grid[2][7] = 1  # Obstacle 1
+Occup_Grid[8][4] = 1  # Obstacle 2
 
 # Starting position
 Start = (0, 0)
 
 # Planner setup
-dstar_planner = DStar(Start, crystals[0], Occup_Grid)  # Initial goal is the first crystal
-
 path_planner = PathPlanner(Start, crystals[0], Occup_Grid)
+dstar_planner = DStar(Start, crystals[0], Occup_Grid)
 
-# Loop through each crystal
+# Pathfinding loop
 for crystal in crystals:
-    print(f"Planning path to crystal {crystal}...")
-    dstar_planner.goal = crystal
-    path = dstar_planner.plan()
-    path_planner.Start = path[-1]  # Set new start as the last point of the path
-    path_planner.Goal = crystal
-    path_planner.visualize_path(path)
     
+    print(f"Planning path to crystal {crystal}...")
+    dstar_planner.update_map(crystal)  # Update goal
+    path = dstar_planner.plan()
+    path_planner.visualize_grid(path, crystal)
+    
+
+    # Mark the crystal as visited
+    Occup_Grid[crystal[0]][crystal[1]] = 0  # Reset crystal location
+    Start = crystal  # Update start position
+    dstar_planner.start = Start  # Update D* start
+    path_planner.visualize_grid(path, crystal)
+    plt.show()
+# Keep the plot open at the end
+
+
+
 
